@@ -1,0 +1,59 @@
+| Server class
+	-> on Construction : setup mandatories
+		-> throw on fail
+	-> method "run" that launch the infinite while
+
+| Client class
+	-> to stock infos by socket_fd
+	-> channels : une liste ?
+
+| main()
+	-> parse port / params
+	-> run server and catch exceptions thrown
+
+---
+-> map de commande ? (NOM DE LA COMMANDE, fonction de la commande)
+---
+
+auth:
+PASS
+Parameters: <password>
+
+NICK:
+Parameters: <nickname> [ <hopcount> ]
+
+USER
+Parameters: <username> <hostname> <servername> <realname>
+
+JOIN
+Parameters: <channel>{,<channel>} [<key>{,<key>}]
+
+PRIVMSG
+Parameters: <receiver>{,<receiver>} <text to be sent>
+
+KICK
+Parameters: <channel> <user> [<comment>]
+
+INVITE
+Parameters: <nickname> <channel>
+
+TOPIC
+Parameters: <channel> [<topic>]
+
+MODE
+Parameters: <channel> {[+|-]|i|t|k|o|l} [<limit>] [<user>] [<ban mask>]
+
+Retour de German Elite :
+>> @time=2025-09-22T11:59:56.537Z :Armida.german-elite.net MODE #chanchanchan +nt
+>> :Armida.german-elite.net 353 nick1234 = #chanchanchan :@nick1234!~user1234@GE-9042C255.unyc.it
+>> :Armida.german-elite.net 366 nick1234 #chanchanchan :End of /NAMES list.
+>> :Armida.german-elite.net 324 nick1234 #chanchanchan +nt
+>> :Armida.german-elite.net 329 nick1234 #chanchanchan 1758542396
+>> :Armida.german-elite.net 354 nick1234 152 #chanchanchan ~user1234 GE-9042C255.unyc.it * nick1234 Hs@ 0 :realname
+>> :Armida.german-elite.net 315 nick1234 #chanchanchan :End of /WHO list.
+
+il faut que tout le monde le recoive
+>> @time=2025-09-23T09:21:13.217Z :rick1234!~oser1234@GE-9042C255.unyc.it JOIN #chan1 * :realname
+
+ca c'est que pour le client qui join le chan
+>> :Armida.german-elite.net 353 rick1234 = #chan1 :rick1234!~oser1234@GE-9042C255.unyc.it @nick1234!~user1234@GE-9042C255.unyc.it

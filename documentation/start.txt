@@ -1,0 +1,267 @@
+Recommandations avant de coder
+
+Apprends les bases des sockets : socket(), bind(), listen(), accept(), recv(), send()
+
+Regarde le protocole IRC (RFC 2812)
+
+Fais un mini serveur TCP simple avant d’ajouter le protocole IRC
+
+Teste avec nc (netcat) avant de passer à un vrai client IRC
+
+Fais une boucle de log claire (pour débuguer les échanges)
+
+
+
+
+
+
+
+
+1_Le serveur
+
+Démarre sur un port et attend des connexions
+
+Gère plusieurs clients simultanément (donc gestion d’I/O multiplexing avec poll() ou select())
+
+Analyse et interprète les commandes IRC
+
+
+
+
+
+
+2_Les clients
+
+Chaque client a :
+
+un socket (connexion)
+
+un nickname (NICK)
+
+un username (USER)
+
+une liste de canaux (JOIN)
+
+Le serveur stocke toutes ces infos dans des structures de données (souvent des std::map ou std::vector)
+
+
+
+
+
+
+3_Les canaux (channels)
+
+Un canal (ex: #general) contient plusieurs utilisateurs
+
+Il a un nom, une liste d’utilisateurs, et éventuellement des modes (opérateurs, invitations, etc.)
+
+Les commandes typiques :
+
+JOIN #channel
+
+PART #channel
+
+PRIVMSG #channel :message
+
+
+
+
+
+4_Les commandes IRC importantes à gérer
+
+Même si ft_irc ne demande pas tout le protocole IRC, tu dois au minimum comprendre les fondamentaux :
+
+Commande	Rôle
+PASS	Mot de passe de connexion
+NICK	Définit le pseudonyme
+USER	Définit le nom d’utilisateur
+JOIN	Rejoint un canal
+PART	Quitte un canal
+PRIVMSG	Envoie un message à un utilisateur ou un canal
+QUIT	Déconnecte le client
+PING / PONG	Maintient la connexion active (keep-alive)
+
+
+
+5_Le cycle de vie d’une connexion
+
+Connexion TCP : le client se connecte au port du serveur.
+
+Authentification : il envoie PASS, NICK, USER.
+
+Serveur répond : messages de bienvenue.
+
+Participation : le client peut rejoindre des channels, envoyer des messages, etc.
+
+Déconnexion : QUIT ou fermeture du socket.
+
+
+
+6_Les notions techniques clés
+
+a- Gestion des connexions simultanées
+
+Tu dois gérer plusieurs clients à la fois sans threads.
+Utilise poll() ou select() pour surveiller plusieurs sockets en même temps.
+
+b- Parsing des messages
+
+Les messages IRC ont une syntaxe stricte, par exemple :
+
+:Nick!user@host PRIVMSG #general :Hello world!
+
+
+Tu devras découper cette chaîne pour en extraire :
+
+la source (Nick!user@host)
+
+la commande (PRIVMSG)
+
+les paramètres (#general, Hello world!)
+
+c- Structure du code
+
+Tu auras probablement des classes comme :
+
+Server
+
+Client
+
+Channel
+
+Message (facultative, pour parser les commandes)
+Et un main qui lance la boucle principale du serveur.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int socket(int domain, int type, int protocol);
+	> permet de generer un socket en renvoyant un fd.
+	> "domain" correspond au domaine dans le quel le socket va etre créé. déterminé par des flags
+		> AF_INET permet de connecter au domaine IPv4
+	> "type" correspond au mode de communication
+	> On va utiliser SOCK_STREAM (mode classique, sans perte de packet, et TCP)
+	> "protocol" permet de preciser un protocol pour le domaine et le type
+		> pour utiliser les protocols par default, on met 0
+	> return -1 en cas d'erreur
+
+	--> utilisation probable : int fdsock = socket(AF_INET, SOCK_STREAM, 0);
+
+Notes
+
+Par défaut blocant, on peut le rendre non-bloquant avec fcntl(fd, F_SETFL, O_NONBLOCK).
+Toujours vérifier la valeur retournée avant d’utiliser le fd.
+close(fd) libèrera le fd.
+
+
+
+int close(int fildes);
+	> s'adapte si c'est un file ou un socket,
+	le kernel organise la liste des fds et ce que c'est pour les liberer proprement
+
+
+
+
+
+
+
+int setsockopt(int socket, int level, int option_name,
+				const void *option_value, socklen_t option_len);
+
+	> sert a configurer les options du socket
+	> "socket" - le socket a configurer
+	> "level" -> SOL_SOCKET pour option generique du socket.
+	> "option_name" -> l'option en question pour configurer le socket (SO_REUSEADDR).
+		>SO_REUSEADDR est l'option qui permet ou non de reutiliser une adresse locale
+	> "option_value" -> depend de l'option, mais par exemple 1 ou 0 pour SO_REUSEADDR (activé, pas activé)
+	> "option_len" -> sizeof(option_value)
+
+	--> a tester "setsockopt(fdsock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) (int opt = 1 avant)",
+	ca permet de couper le serveur et pouvoir s'y reconnecter direct sans attendre TIME_WAIT parce que TCP peut etre bloquant.
+	cela dit, chatGPT le conseille pour un serveur TCP (je vais oublier ce qu'est un serveur TCP)
+
+	--> int flag = 1; setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+	option interessante pour un chat : permet de debloquer l'envoie de petits messages sans delais (normalement ca fait des gros paquets)
+		Exemple :
+			Application envoie 3 petits messages : “A”, “B”, “C”.
+			TCP peut attendre un peu et envoyer “ABC” dans un seul paquet, pour réduire l’overhead réseau.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,464 @@
+>>> Includes list
+
+//socket, getsockname, setsockopt, bind, connect, listen, accept, send, recv,
+#include <sys/socket.h>
+	int socket(int domain, int type, int protocol);
+	int getsockname(int socket, struct sockaddr *restrict address, socklen_t *restrict address_len);
+	int setsockopt(int socket, int level, int option_name, const void *option_value, socklen_t option_len);
+	int bind(int socket, const struct sockaddr *address, socklen_t address_len);
+	int connect(int socket, const struct sockaddr *address, socklen_t address_len);
+	int listen(int socket, int backlog);
+	int accept(int socket, struct sockaddr *restrict address, socklen_t *restrict address_len);
+	ssize_t send(int socket, const void *buffer, size_t length, int flags);
+	ssize_t recv(int socket, void *buffer, size_t length, int flags);
+
+//getprotobyname, gethostbyname,
+#include <netdb.h>
+	struct protoent *getprotobyname(const char *name);
+	struct hostent *gethostbyname(const char *name);
+
+//close, lseek,
+#include <unistd.h>
+	int close(int fildes);
+	off_t lseek(int fildes, off_t offset, int whence);
+
+//getaddrinfo, freeaddrinfo,
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+	int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
+	void freeaddrinfo(struct addrinfo *res);
+
+//htons, htonl, ntohs, ntohl
+#include <arpa/inet.h>
+	uint32_t htonl(uint32_t hostlong);
+	uint16_t htons(uint16_t hostshort);
+	uint32_t ntohl(uint32_t netlong);
+	uint16_t ntohs(uint16_t netshort);
+
+//inet_addr, inet_ntoa
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+	in_addr_t inet_addr(const char *cp);
+	char *inet_ntoa(struct in_addr in);
+
+//signal, sigaction,
+#include <signal.h>
+	void (*signal(int sig, void (*func)(int)))(int);
+	int sigaction(int sig, const struct sigaction *restrict act, struct sigaction *restrict oact);
+
+//fstat,
+#include <sys/stat.h>
+	int fstat(int fildes, struct stat *buf);
+
+//fcntl
+#include <fcntl.h>
+	int fcntl(int fildes, int cmd, ...);
+
+	/!\ le sujet dit :
+	However, you are allowed to use fcntl() only as follows:
+	fcntl(fd, F_SETFL, O_NONBLOCK);
+	Any other flag is forbidden.
+
+/*-----*/
+
+//poll,
+#include <poll.h>
+	int poll(struct pollfd fds[], nfds_t nfds, int timeout);
+
+-> equivalents:
+
+//select,
+#include <sys/select.h>
+	int select(int nfds, fd_set *restrict readfds, fd_set *restrict writefds, fd_set *restrict errorfds, struct timeval *restrict timeout);
+
+//	kqueue --> non disponible sur linux (macOS), equivalent a epoll().
+
+//epoll_create1, epoll_ctl, epoll_wait, epoll_pwait
+#include <sys/epoll.h>
+	int epoll_create1(int flags);
+	int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+	int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
+	int epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+>>> Les fonctions autorisees :
+
+
+int socket(int domain, int type, int protocol);
+	> permet de generer un socket en renvoyant un fd.
+	> "domain" correspond a au domaine / famille d'adresse / dans le quel le socket va etre créé. déterminé par des flags
+		> par exemple, AF_INET permet de connecter au domaine IPv4
+	> "type" correspond au mode de communication
+		> dans l'idee, ca permet de definir la structure du socker au niveau du kernel (je pige pas tout)
+		> je suppose qu'on va utiliser SOCK_STREAM (mode classique, sans perte de packet)
+	> "protocol" permet de preciser un protocol pour le domaine et le type
+		> pour utiliser les protocols par default, on met 0
+	> return -1 en cas d'erreur
+
+	--> utilisation probable : int fdsock = socket(AF_INET, SOCK_STREAM, 0);
+
+
+
+
+
+
+int close(int fildes);
+	> interessant : il peut s'adapter si c'est un file ou un socket,
+	le kernel organise la liste des fds et ce que c'est pour les liberer proprement
+
+
+
+
+
+int setsockopt(int socket, int level, int option_name, const void *option_value, socklen_t option_len);
+	> sert a configurer les options du socket
+	> "socket" - le socket a configurer
+	> "level" -> il s'agit de la couche où appliquer la configuration, SOL_SOCKET pour la configuration generale du socket
+	> "option_name" -> l'option en question pour configurer le socket
+		> par exemple, SO_REUSEADDR est l'option qui permet ou non de reutiliser une adresse locale
+	> "option_value" -> depend de l'option, mais par exemple 1 ou 0 pour SO_REUSEADDR (activé, pas activé)
+	> "option_len" -> sizeof(option_value)
+
+	--> a tester "setsockopt(fdsock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) (int opt = 1 avant)",
+	ca permet de couper le serveur et pouvoir s'y reconnecter direct sans attendre TIME_WAIT parce que TCP peut etre bloquant.
+	cela dit, chatGPT le conseille pour un serveur TCP (je vais oublier ce qu'est un serveur TCP)
+
+	--> int flag = 1; setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+	option interessante pour un chat : permet de debloquer l'envoie de petits messages sans delais (normalement ca fait des gros paquets)
+		Exemple :
+			Application envoie 3 petits messages : “A”, “B”, “C”.
+			TCP peut attendre un peu et envoyer “ABC” dans un seul paquet, pour réduire l’overhead réseau.
+
+
+
+
+
+
+
+int getsockname(int socket, struct sockaddr *restrict address, socklen_t *restrict address_len);
+	> je vois pas a quoi ca sert, si on met le port en parametre du serveur (./ircserv <port> <password>),
+		parce qu'apparemment ca permet de recuperer l'info de c'est quoi le port.
+	> "Lise": est-ce que c'est pas pour verifier que le port a bien ete attribué/bindé ?
+
+
+
+
+
+struct protoent *getprotobyname(const char *name);
+	> permet de generer un protocol par rapport a son nom.
+		Par exemple
+			struct protoent *proto = getprotobyname("tcp");
+			int sockfd = socket(AF_INET, SOCK_STREAM, proto->p_proto);
+	> au lieu de mettre 0, on s'assure que le protocol est le bon...
+	chatGPT? Utilité : obtenir le numéro de protocole à passer à socket().
+	> pas sur de l'utilité pour nous, sachant que 0 le gere tres bien.
+
+
+
+
+
+struct hostent *gethostbyname(const char *name);
+	> obsolete, remplacé par getaddrinfo(...)
+
+
+
+
+
+
+int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res); et void freeaddrinfo(struct addrinfo *res);
+	> ca a l'air interessant pour avoir toutes les info adresse directement traduites en binaires.
+	> ca rempli une structure avec toutes les infos pretes a etre utilisees pour :
+		socket()
+		et bind() (ou connect())
+
+	Exemple GPT:
+		struct addrinfo hints, *res;
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_UNSPEC;      // IPv4 ou IPv6
+		hints.ai_socktype = SOCK_STREAM;  // TCP
+
+		if (getaddrinfo("www.google.com", "80", &hints, &res) == 0) {
+			// res pointe vers une liste d'adresses prêtes à connecter
+			int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+			connect(sockfd, res->ai_addr, res->ai_addrlen);
+			freeaddrinfo(res);
+		}
+	> ca permettrait a Autman de mieux avoir la sensation de maitriser ce qu'on met dans socket pour l'init,
+		au lieu de me dire "c'est ca qu'il faut pcq c'est comme ca"
+	> a voir, c'est pas forcement utile du coup, d'autant plus que traduire une addr en chaine de char "127.0.0.1" en binaire on a aussi des fonctions pour le faire
+	> attention, le resultat (**res) doit etre free avec freeaddrinfo(res).
+	> return 0 en cas de success, sinon il renvoi des valeurs erreur differentes.
+
+
+
+
+
+
+int bind(int socket, const struct sockaddr *address, socklen_t address_len);
+	> bind est une base de tout serveur, il permet de dire : "ce socket va etre lié a cette adresse (IP + port)"
+	c'est lui qui sait quoi faire du port d'ecoute.
+	sans ça, pas de serveur car le socket ne serait pas identifié dans le reseau
+	> on a donc le socket, qui est une structure au niveau du kernel identifié par son fd.
+	> l'adresse sous forme d'IP + port, il s'agit d'une structure dispo avec socket,
+		struct sockaddr (qui peut venir de sockaddr_in pour IPv4 ou sockaddr_in6 pour IPv6 par exemple)
+		grace a cette struct, on peut preciser
+			la famille du reseau (AF_INET),
+			le port (qui doit etre converti en network byte order [htons("port")])
+			et c'est quoi qu'on doit ecouter (INADDR_ANY pour ecouter en local)
+				> a voir si on se sert de getaddrinfo ou non pour le port et la famille du reseau, pas besoin de convertir avec ca.
+	> la taille de l'adresse (sizeof(struct sockaddr_in) pour IPv4)
+	> return -1 en cas d'echec
+
+		> exemple GPT de la struct address*
+			struct sockaddr_in addr;
+			addr.sin_family = AF_INET;          // Famille : IPv4
+			addr.sin_port = htons(8080);        // Port en format réseau
+			addr.sin_addr.s_addr = INADDR_ANY;  // IP locale (ici toutes les interfaces)
+
+			bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
+
+
+
+
+
+
+int connect(int socket, const struct sockaddr *address, socklen_t address_len);
+	> fonctionne de maniere tres similaire a bind, avec les memes info,
+	mais lui, ne sert pas a faire fonctionner le serveur, il sert aux clients a se connecter au serveur.
+	donc le client va faire un connect() sur les infos du serveur, et cote serveur on va essayer de le listen() et de l'accept()
+
+	-> ce sera surtout utile si on veut coder un client qui veut se connecter a notre serveur, comme un bot par exemple
+
+
+
+
+
+
+int listen(int socket, int backlog);
+	> tres simple, permet de passer le socket en mode "ecoute" :
+		autrement dit, grace a listen, on pourra accepter des connexions entrantes, pas de listen = pas de clients
+	> "backlog" impose une limite de connexion simultanées avant de refuser des clients.
+	> return -1 en cas d'erreur
+
+	> par exemple, listen(sockfd, 5); acceptera 5 connexions avant d'echouer
+
+
+
+
+
+
+int accept(int socket, struct sockaddr *restrict address, socklen_t *restrict address_len);
+	> le pendant "serveur" de connect(), permet de generer un nouveau fd pour un socket client.
+	> ca permettra de communiquer avec ce client via son fd, (notamment avec recv() et send())
+	> chatGPT me precise que le socket d'origine (serveur) reste en ecoute (listen_sock) :
+		ca veut dire que le socket du serveur est un socket qui va "ecouter", et les socket client va servir a communiquer avec le client.
+
+uint32_t htonl(uint32_t hostlong);
+uint16_t htons(uint16_t hostshort);
+uint32_t ntohl(uint32_t netlong);
+uint16_t ntohs(uint16_t netshort);
+	> 4 fonctions de convertion network <-> host
+		ca permet de resoudre les differences big-endian et little-endian qu'il peut y avoir entre les machines,
+		sur le reseau, les ports (et adresses IP) sont stockees en big-endian, donc pour tout soit compatibles
+		on utilise ces fonctions pour que soit il change de little vers big endian, soit il ne fait rien.
+	> hton* -> on donne un port et on le converti en big-endian
+		> utilisé quand on a un port fixe (comme dans notre cas avec av[1])
+	> ntoh* -> on recoit un port et on le converti selon l'architecture du pc.
+		> utilisé quand on accepte un client, dans la struct sockaddr_in on a acces a l'adresse IP du client et le port (donné par le kernel)
+
+
+
+
+
+
+in_addr_t inet_addr(const char *cp);
+char *inet_ntoa(struct in_addr in);
+	> 2 autres fonctions de convertion adresse IP <-> char *
+		ca permet de prendre une adresse IP en texte et la traduire en format binaire, stocke dans un in_addr_t, et inversement
+		utile pour bind() ou connect() si on veut utiliser une adresse IP qu'on connait
+		ou accept() si on veut lire une adresse IP qu'on a recu et qu'on ne connait pas.
+
+ssize_t send(int socket, const void *buffer, size_t length, int flags);
+ssize_t recv(int socket, void *buffer, size_t length, int flags);
+	> envoyer (send) au socket du client, un message "buffer" de taille length, les flags sont des options (0 par default)
+	> recevoir (recv) depuis le socket du client, un message "buffer" de taille length, idem pour les flags.
+	> les 2 return -1 si erreur
+
+
+
+
+
+
+void (*signal(int sig, void (*func)(int)))(int);
+int sigaction(int sig, const struct sigaction *restrict act, struct sigaction *restrict oact);
+	> gestion des signaux. pas de recherche de ma part.
+
+off_t lseek(int fildes, off_t offset, int whence);
+	> permet de trouver une position dans un fichier, pas utile pour les socket ???
+		- d'apres chatGPT, ca ne peut pas etre utilise avec un socket parce que c'est un stream et pas un fichier, y a pas de notion de "curseur"
+	> ca retourne une nouvelle position.
+	> si c'est pour le FTP, je vois pas trop comment l'utiliser vu qu'on a pas open O_o
+
+		| Paramètre | Rôle                                                                      |
+		| --------- | ------------------------------------------------------------------------- |
+		| `fildes`  | File descriptor (obtenu via `open()` ou autre).                           |
+		| `offset`  | Décalage par rapport au point de référence. Peut être positif ou négatif. |
+		| `whence`  | Point de référence pour `offset`. Valeurs possibles :                     |
+		|           | `SEEK_SET` → début du fichier                                             |
+		|           | `SEEK_CUR` → position courante                                            |
+		|           | `SEEK_END` → fin du fichier                                               |
+
+
+
+
+
+int fstat(int fildes, struct stat *buf);
+	> un peu comme lseek, surtout utile pour les fichiers.
+	> la seule utilite pour un socket selon chatGPT :
+		savoir que c'est bien un socket.
+	> pourquoi pas pour le FTP. pour connaitre toutes les infos du fichier qu'on transfert
+
+
+
+
+
+int fcntl(int fildes, int cmd, ...);
+	> outil de manip des fd (fichiers, socket...), permet de lui attribuer des flags
+		nous on a le droit que de rendre le socket_fd en non bloquant.
+	> ca a l'air fun.
+
+
+
+
+
+int poll(struct pollfd fds[], nfds_t nfds, int timeout);
+	> permet de gerer un socket non bloquant grace a des events.
+		POLLIN → lecture possible
+		POLLOUT → écriture possible sans blocage
+		POLLHUP → le client a fermé la connexion proprement
+		POLLERR → erreur anormale (reset TCP, problème réseau)
+	> attention a l'utilisation pour checker le resultat dans revents,
+		la bonne maniere est de faire une comparaison binaire,
+		sinon avec == POLLIN on ne regarde que si y a seulement POLLIN mais rien ne nous le garanti
+
+>>> Glossaire
+
+	socket ?
+		c'est representé par un file descriptor dans un programme
+		un point de communication reseau ?
+
+	port ?
+		si l'adresse IP est un immeuble, le port est son numero d'appartement
+		autrement dit, le programme a l'adresse IP x.x.x.x a un port xxxxx pour pouvoir communiquer avec.
+		un port va de 0 a 65536 (16 bits)
+		un port est toujours associé a un protocol (comme TCP ou UDP, un protocol de la couche TRANSPORT)
+
+		chatGPT :
+			Le noyau lit l’adresse IP → détermine quelle machine doit le traiter (toi).
+			Il lit le protocole de transport (TCP ou UDP).
+			Il lit le numéro de port → détermine quel socket/processus dans ton OS doit recevoir les données.
+
+			Sans port, le noyau saurait qu’un paquet t’est destiné, mais pas quel programme doit le recevoir.
+
+			Une connexion TCP complète est identifiée par ce qu’on appelle une quadruplet :
+				(IP source, Port source, IP destination, Port destination)
+				Port destination : numéro que tu as choisi pour ton service (ex: 6667 pour IRC).
+				Port source : numéro éphémère choisi par le client (ex: 52341).
+
+			Le port source permet de distinguer plusieurs connexions venant d’une même machine cliente.
+
+			| Plage           | Nom                 | Usage typique                                                        |
+			| --------------- | ------------------- | -------------------------------------------------------------------- |
+			| **0–1023**      | *Well-known ports*  | Services standards (HTTP=80, SSH=22, IRC=6667, etc.).                |
+			| **1024–49151**  | *Registered ports*  | Applications enregistrées, mais non standards.                       |
+			| **49152–65535** | *Ephemeral/Dynamic* | Ports temporaires attribués aux clients pour initier des connexions. |
+
+			Un port n’est pas une porte physique,
+			c’est un index dans une table du noyau qui permet d’acheminer les paquets entrants
+			vers le bon socket et donc le bon processus.
+
+	TCP ? UDP ?
+		ce sont des protocol reseau. C'est a dire, c'est un ensemble de regle qui determine comment 2 machines se parlent
+		par exemple, ca definit la syntaxe, comment les choses se lisent, mais aussi le comportement
+			(est-ce qu'on attends tous les paquets, qu'est ce qu'on fait si un message arrive en retard ? ...)
+		HTTP est aussi un protocol où le serveur repond avec une page html
+		attention : HTTP et TCP/UDP ne font pas parti de la meme couche reseau
+			HTTP, FTP, SSH, DNS font parti de la couche application (la langue parlé par les programmes)
+			tandis que TCP et UDP de la couche transport.
+			Il y a aussi IP qui est un protocol, lui de la couche reseau
+			et enfin, le reseau physique est aussi une couche dont les protocol sont des envois en bytes (fibre, wi-fi...)
+
+		Quand on fait socket(), bind() setsockopt(), on dit au kernel comment configurer le serveur, par exemple avec le protocol TCP
+		Concretement, nous on a faire un serveur configuré en protocol TCP mais ca ne nous concerne pas directement
+		ce qui nous concerne c'est le protocol IRC (oui c'est un protocol).
+
+		Parce que la couche application, c'est elle qui determine comment les clients et le serveur communiquent.
+		Certes les infos (paquets) communiquent selon les regles du protocol TCP, mais la forme des messages font parti du protocol IRC.
+		en gros, on doit parser ce qu'on recoit d'un client selon le protocol IRC pour pouvoir reagir
+		par exemple, si on recois d'un client {USER michel\r\n}, notre serveur doit etre capable de dire "ok, ce client s'appelle michel"
+
+		voici des tableaux chatGPT pour resumer :
+
+			| Couche                   | Rôle principal                                                                                                      | Exemples                                                                                     |
+			| ------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+			| **Application**          | Définir le **langage** que comprennent les programmes (client/serveur).                                             | HTTP (web), FTP (fichiers), SSH (connexion distante), SMTP (mail), DNS (résolution de noms)… |
+			| **Transport**            | Permettre à deux **programmes** (pas seulement machines) de communiquer. Fournit ports, fiabilité, flux de données. | **TCP**, **UDP**                                                                             |
+			| **Internet (ou Réseau)** | Acheminer les paquets entre **machines** d’un réseau à l’autre.                                                     | **IP** (IPv4, IPv6), ICMP                                                                    |
+			| **Lien/Accès réseau**    | Envoyer les bits sur le **support physique** (câble, ondes).                                                        | Ethernet, Wi-Fi, Fibre, 4G…                                                                  |
+
+			| Protocole     | Transport                    | Fonction                          |
+			| ------------- | ---------------------------- | --------------------------------- |
+			| **HTTP**      | TCP                          | Transférer des pages web.         |
+			| **HTTPS**     | TCP + TLS                    | Web sécurisé (chiffrement).       |
+			| **FTP**       | TCP                          | Transfert de fichiers.            |
+			| **SSH**       | TCP                          | Connexion terminal chiffrée.      |
+			| **DNS**       | UDP (souvent), TCP (parfois) | Résoudre un nom de domaine en IP. |
+			| **SMTP/IMAP** | TCP                          | Envoi/Réception de mails.         |
+
+		petite pensée bonus : si jamais on veut coder nous meme le transfert de fichier par FTP,
+			ca veut dire parler aux clients avec le protocol FTP (= nouveau parsing!)
+
+>>> Infos supplementaires:
+
+>> (question posee aux IA : chatGPT, claude.ai, mistral.ai)
+	> Bonjour, c'est quoi le mot clé "*restrict" qu'on peut voir dans certains prototypes comme select() par exemple ?
+
+	De ce que je comprends, c'est un moyen de dire au compilateur qu'un pointeur restrict est le seul moyen
+	d'acceder a la zone memoire pointée. Ca servirait a optimiser et securiser.
+	Concretement, ca empeche plusieurs pointeurs de partager la meme zone memoire.
